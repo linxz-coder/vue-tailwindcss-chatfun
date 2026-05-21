@@ -53,27 +53,45 @@
         >
           <button
             type="button"
-            class="absolute inset-y-0 left-0 w-20 rounded-2xl bg-rose-500 text-sm font-semibold text-white"
+            class="absolute inset-y-0 right-0 w-20 rounded-2xl bg-rose-500 text-sm font-semibold text-white md:hidden"
             @click.stop="deleteChat(chat.id)"
           >
             删除
           </button>
-          <button
-            type="button"
-            :class="[
-              'relative block w-full rounded-2xl px-4 py-3 text-left transition active:scale-[0.99]',
-              chat.id === currentChatId
-                ? 'bg-teal-50 text-teal-950 ring-1 ring-teal-100'
-                : 'bg-white text-slate-700 hover:bg-slate-50'
-            ]"
-            :style="{ transform: swipedChatId === chat.id ? 'translateX(80px)' : 'translateX(0)' }"
-            @touchstart="handleChatTouchStart($event, chat.id)"
-            @touchend="handleChatTouchEnd($event, chat.id)"
-            @click="handleChatClick(chat.id)"
+          <div
+            class="relative rounded-2xl bg-white transition"
+            :style="{ transform: swipedChatId === chat.id ? 'translateX(-80px)' : 'translateX(0)' }"
           >
-            <div class="truncate text-[15px] font-semibold">{{ chat.title }}</div>
-            <div class="mt-1 truncate text-sm text-slate-500">{{ chat.lastMessage }}</div>
-          </button>
+            <button
+              type="button"
+              :class="[
+                'block w-full rounded-2xl px-4 py-3 text-left transition active:scale-[0.99] md:pb-8 md:pr-12',
+                chat.id === currentChatId
+                  ? 'bg-teal-50 text-teal-950 ring-1 ring-teal-100'
+                  : 'bg-white text-slate-700 hover:bg-slate-50'
+              ]"
+              @touchstart="handleChatTouchStart($event, chat.id)"
+              @touchend="handleChatTouchEnd($event, chat.id)"
+              @click="handleChatClick(chat.id)"
+            >
+              <div class="truncate text-[15px] font-semibold">{{ chat.title }}</div>
+              <div class="mt-1 truncate text-sm text-slate-500">{{ chat.lastMessage }}</div>
+            </button>
+            <button
+              type="button"
+              :aria-label="`删除${chat.title || '会话'}`"
+              class="absolute bottom-2 right-2 hidden h-8 w-8 place-items-center rounded-full text-slate-400 transition hover:bg-rose-50 hover:text-rose-600 md:grid"
+              @click.stop="deleteChat(chat.id)"
+            >
+              <svg stroke="currentColor" fill="none" stroke-width="1.7" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" xmlns="http://www.w3.org/2000/svg">
+                <path d="M3 6h18"></path>
+                <path d="M8 6V4h8v2"></path>
+                <path d="M19 6l-1 14H6L5 6"></path>
+                <path d="M10 11v5"></path>
+                <path d="M14 11v5"></path>
+              </svg>
+            </button>
+          </div>
         </div>
         <div v-if="filteredChatList.length === 0" class="rounded-2xl px-4 py-5 text-sm text-slate-500">
           无相关搜索结果
@@ -357,9 +375,9 @@ function handleChatTouchEnd(event, chatId) {
   const deltaX = touch.clientX - touchStart.value.x
   const deltaY = Math.abs(touch.clientY - touchStart.value.y)
 
-  if (deltaX > 56 && deltaY < 42) {
+  if (deltaX < -56 && deltaY < 42) {
     swipedChatId.value = chatId
-  } else if (deltaX < -24 || deltaY >= 42) {
+  } else if (deltaX > 24 || deltaY >= 42) {
     swipedChatId.value = ''
   }
 
