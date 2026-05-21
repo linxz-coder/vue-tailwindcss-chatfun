@@ -24,16 +24,14 @@
         </div>
         <!-- 开始新对话 -->
         <div class="hidden md:block">
-          <el-button class="soft-icon-button" circle @click="startNewChat">
-            <img src="/new.svg" width="20" height="20" alt="Start new chat" />
-          </el-button>
+          <button type="button" class="icon-button" aria-label="新增会话" @click="startNewChat">
+            <img src="/new.svg" class="h-5 w-5" width="20" height="20" alt="Start new chat" />
+          </button>
         </div>
         <div class="md:hidden">
-          <el-button class="soft-icon-button" circle @click="toggleSidebar">
-            <el-icon>
-              <Close />
-            </el-icon>
-          </el-button>
+          <button type="button" class="icon-button" aria-label="关闭会话管理" @click="toggleSidebar">
+            <Close class="h-5 w-5" />
+          </button>
         </div>
       </div>
 
@@ -48,20 +46,38 @@
 
       <!-- 聊天列表 -->
       <div class="flex-1 space-y-1 overflow-y-auto px-3 pb-6">
-        <button
+        <div
           v-for="chat in filteredChatList"
           :key="chat.id"
-          :class="[
-            'block w-full rounded-2xl px-4 py-3 text-left transition active:scale-[0.99]',
-            chat.id === currentChatId
-              ? 'bg-teal-50 text-teal-950 ring-1 ring-teal-100'
-              : 'text-slate-700 hover:bg-slate-50'
-          ]"
-          @click="selectChat(chat.id)"
+          class="relative overflow-hidden rounded-2xl"
         >
-          <div class="truncate text-[15px] font-semibold">{{ chat.title }}</div>
-          <div class="mt-1 truncate text-sm text-slate-500">{{ chat.lastMessage }}</div>
-        </button>
+          <button
+            type="button"
+            class="absolute inset-y-0 left-0 w-20 rounded-2xl bg-rose-500 text-sm font-semibold text-white"
+            @click.stop="deleteChat(chat.id)"
+          >
+            删除
+          </button>
+          <button
+            type="button"
+            :class="[
+              'relative block w-full rounded-2xl px-4 py-3 text-left transition active:scale-[0.99]',
+              chat.id === currentChatId
+                ? 'bg-teal-50 text-teal-950 ring-1 ring-teal-100'
+                : 'bg-white text-slate-700 hover:bg-slate-50'
+            ]"
+            :style="{ transform: swipedChatId === chat.id ? 'translateX(80px)' : 'translateX(0)' }"
+            @touchstart="handleChatTouchStart($event, chat.id)"
+            @touchend="handleChatTouchEnd($event, chat.id)"
+            @click="handleChatClick(chat.id)"
+          >
+            <div class="truncate text-[15px] font-semibold">{{ chat.title }}</div>
+            <div class="mt-1 truncate text-sm text-slate-500">{{ chat.lastMessage }}</div>
+          </button>
+        </div>
+        <div v-if="filteredChatList.length === 0" class="rounded-2xl px-4 py-5 text-sm text-slate-500">
+          无相关搜索结果
+        </div>
       </div>
     </div>
 
@@ -70,21 +86,17 @@
       <!-- 聊天标题 -->
       <div class="flex min-h-[64px] items-center justify-between gap-2 border-b border-white/80 bg-white/85 px-4 shadow-sm backdrop-blur">
         <div :class="[isSidebarOpen ? 'hidden' : 'block', 'md:hidden']">
-          <el-button class="soft-icon-button" circle @click="toggleSidebar">
-            <el-icon>
-              <More />
-            </el-icon>
-          </el-button>
+          <button type="button" class="icon-button" aria-label="会话管理" @click="toggleSidebar">
+            <More class="h-[22px] w-[22px]" />
+          </button>
         </div>
         <h1 class="min-w-0 flex-grow truncate px-2 text-center text-lg font-bold text-slate-700 md:text-left md:text-xl">
           {{ currentChatTitle }}
         </h1>
         <div class="md:hidden">
-          <el-button class="primary-icon-button" circle @click="startNewChat">
-            <el-icon>
-              <Plus />
-            </el-icon>
-          </el-button>
+          <button type="button" class="icon-button icon-button-primary" aria-label="新增会话" @click="startNewChat">
+            <Plus class="h-[22px] w-[22px]" />
+          </button>
         </div>
       </div>
 
@@ -141,7 +153,9 @@
           :disabled="isProcessing"
         >
           <template #append>
-            <el-button :icon="Promotion" @click="sendMessage" :disabled="isProcessing" />
+            <button type="button" class="send-button" @click="sendMessage" :disabled="isProcessing" aria-label="发送">
+              <Promotion class="h-6 w-6" />
+            </button>
           </template>
         </el-input>
       </div>
@@ -169,6 +183,8 @@ const sessions = ref({})
 const currentChatTitle = ref('对话标题')
 const isSidebarOpen = ref(false)
 const messageListRef = ref(null)
+const swipedChatId = ref('')
+const touchStart = ref({ chatId: '', x: 0, y: 0 })
 
 let activeController = null
 
@@ -214,10 +230,11 @@ function createInitialMessage(chatId) {
   }
 }
 
-function buildSession(id, title, sourceMessages, existing = {}) {
+function buildSession(id, title, sourceMessages, existing = {}, options = {}) {
   const savedMessages = cloneMessages(sourceMessages)
   const lastMessage = savedMessages[savedMessages.length - 1]
   const nowMs = Date.now()
+  const shouldTouch = options.touchUpdatedAt !== false || !existing.updatedAtMs
 
   return {
     id,
@@ -226,8 +243,8 @@ function buildSession(id, title, sourceMessages, existing = {}) {
     lastMessage: lastMessage?.content || '新对话',
     createdAt: existing.createdAt || nowText(),
     createdAtMs: existing.createdAtMs || nowMs,
-    updatedAt: nowText(),
-    updatedAtMs: nowMs
+    updatedAt: shouldTouch ? nowText() : existing.updatedAt,
+    updatedAtMs: shouldTouch ? nowMs : existing.updatedAtMs
   }
 }
 
@@ -235,7 +252,7 @@ function persistSessions() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions.value))
 }
 
-function saveCurrentSession() {
+function saveCurrentSession(options = {}) {
   if (!currentChatId.value) return
 
   const existing = sessions.value[currentChatId.value] || {}
@@ -245,7 +262,8 @@ function saveCurrentSession() {
       currentChatId.value,
       currentChatTitle.value,
       messages.value,
-      existing
+      existing,
+      options
     )
   }
   persistSessions()
@@ -291,6 +309,7 @@ function cancelActiveRequest() {
 
 function toggleSidebar() {
   isSidebarOpen.value = !isSidebarOpen.value
+  swipedChatId.value = ''
 }
 
 function startNewChat() {
@@ -311,14 +330,68 @@ function startNewChat() {
 function selectChat(chatId) {
   if (chatId === currentChatId.value) {
     isSidebarOpen.value = false
+    swipedChatId.value = ''
     return
   }
 
   cancelActiveRequest()
-  saveCurrentSession()
+  saveCurrentSession({ touchUpdatedAt: false })
 
   const session = sessions.value[chatId]
   if (session) activateSession(session)
+}
+
+function handleChatTouchStart(event, chatId) {
+  const touch = event.touches[0]
+  touchStart.value = {
+    chatId,
+    x: touch.clientX,
+    y: touch.clientY
+  }
+}
+
+function handleChatTouchEnd(event, chatId) {
+  if (touchStart.value.chatId !== chatId) return
+
+  const touch = event.changedTouches[0]
+  const deltaX = touch.clientX - touchStart.value.x
+  const deltaY = Math.abs(touch.clientY - touchStart.value.y)
+
+  if (deltaX > 56 && deltaY < 42) {
+    swipedChatId.value = chatId
+  } else if (deltaX < -24 || deltaY >= 42) {
+    swipedChatId.value = ''
+  }
+
+  touchStart.value = { chatId: '', x: 0, y: 0 }
+}
+
+function handleChatClick(chatId) {
+  if (swipedChatId.value === chatId) {
+    swipedChatId.value = ''
+    return
+  }
+
+  selectChat(chatId)
+}
+
+function deleteChat(chatId) {
+  const remainingSessions = { ...sessions.value }
+  delete remainingSessions[chatId]
+  sessions.value = remainingSessions
+  swipedChatId.value = ''
+
+  if (chatId === currentChatId.value) {
+    const nextSession = chatList.value[0]
+    if (nextSession) {
+      activateSession(nextSession)
+    } else {
+      currentChatId.value = ''
+      startNewChat()
+    }
+  }
+
+  persistSessions()
 }
 
 async function sendMessage() {
@@ -502,23 +575,37 @@ onMounted(() => {
   overflow-x: auto;
 }
 
-.soft-icon-button,
-.primary-icon-button {
-  width: 42px;
-  height: 42px;
+.icon-button {
+  display: grid;
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  min-height: 44px;
+  place-items: center;
   border: 1px solid rgb(226 232 240);
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
-}
-
-.soft-icon-button {
+  border-radius: 999px;
   background: #ffffff;
   color: #334155;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+  transition: transform 0.15s ease, background-color 0.15s ease;
 }
 
-.primary-icon-button {
-  background: #0f172a;
+.icon-button:active {
+  transform: scale(0.96);
+}
+
+.icon-button-primary {
   border-color: #0f172a;
+  background: #0f172a;
   color: #ffffff;
+}
+
+.search-input {
+  border-radius: 18px;
+  border: 1px solid rgb(203 213 225);
+  background: #eef5f6;
+  padding: 3px;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
 }
 
 .search-input :deep(.el-input__wrapper),
@@ -527,11 +614,20 @@ onMounted(() => {
   box-shadow: none;
 }
 
+.search-input :deep(.el-input__wrapper) {
+  background: #ffffff;
+}
+
 .search-input :deep(.el-input-group__append),
 .composer-input :deep(.el-input-group__append) {
   border-radius: 0 16px 16px 0;
   background: #f8fafc;
   box-shadow: none;
+}
+
+.search-input :deep(.el-input-group__append) {
+  border-left: 1px solid rgb(226 232 240);
+  background: #ffffff;
 }
 
 .search-input :deep(.el-input__inner),
@@ -544,25 +640,44 @@ onMounted(() => {
 }
 
 .composer-input :deep(.el-input-group__append) {
-  min-width: 48px;
+  min-width: 60px;
+  padding: 0 6px;
 }
 
-.composer-input :deep(.el-input-group__append .el-button) {
-  width: 42px;
-  height: 42px;
+.send-button {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+  border: 0;
   border-radius: 999px;
   background: #0f172a;
   color: #ffffff;
+  transition: transform 0.15s ease, background-color 0.15s ease;
 }
 
-.composer-input :deep(.el-input-group__append .el-button.is-disabled) {
+.send-button:active {
+  transform: scale(0.96);
+}
+
+.send-button:disabled {
   background: #cbd5e1;
   color: #ffffff;
+  cursor: not-allowed;
 }
 
 @media (max-width: 767px) {
   .composer-input :deep(.el-input__wrapper) {
     min-height: 52px;
+  }
+
+  .composer-input :deep(.el-input-group__append) {
+    min-width: 62px;
+  }
+
+  .send-button {
+    width: 48px;
+    height: 48px;
   }
 }
 </style>
