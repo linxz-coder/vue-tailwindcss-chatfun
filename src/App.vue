@@ -547,6 +547,19 @@ onMounted(() => {
   min-width: 48px;
 }
 
+.composer-input :deep(.el-input-group__append .el-button) {
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  background: #0f172a;
+  color: #ffffff;
+}
+
+.composer-input :deep(.el-input-group__append .el-button.is-disabled) {
+  background: #cbd5e1;
+  color: #ffffff;
+}
+
 @media (max-width: 767px) {
   .composer-input :deep(.el-input__wrapper) {
     min-height: 52px;
