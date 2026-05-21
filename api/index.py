@@ -13,7 +13,7 @@ load_dotenv()  # 加载 .env 文件中的变量
 app = Flask(__name__)
 CORS(app, origins="*")
 apikey = os.getenv("OPENAI_API_KEY")  # 从环境变量中获取 API 密钥
-client = OpenAI(api_key=apikey, base_url="https://api.siliconflow.cn/v1")
+client = OpenAI(api_key=apikey, base_url="https://api.deepseek.com")
 
 # 数据库连接函数
 def get_db_connection():
@@ -98,7 +98,7 @@ def generate():
         # 这里full_response存储完整内容，用以数据库存储
         full_response = ""
         for res in client.chat.completions.create(
-                model="alibaba/Qwen1.5-7B-Chat",
+                model="deepseek-v4-flash",
                 messages=messages,
                 stream=True
         ):

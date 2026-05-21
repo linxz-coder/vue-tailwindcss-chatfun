@@ -120,6 +120,7 @@ const chatList = ref([])
 const currentChatTitle = ref('对话标题')
 const isSidebarOpen = ref(false)
 const chatContainer = ref(null);
+const chatApiUrl = 'https://www.chatfun.site/api/python'
 
 
 // 计算属性
@@ -170,7 +171,7 @@ async function sendMessage() {
 
   // AI 回复
   try {
-    const response = await axios.post('https://www.commonlearner.com:5328/api/python', {
+    const response = await axios.post(chatApiUrl, {
       content: userMessageContent,
       chatHistory: JSON.stringify(messages.value)
     }, {
