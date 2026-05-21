@@ -74,7 +74,12 @@
               @touchend="handleChatTouchEnd($event, chat.id)"
               @click="handleChatClick(chat.id)"
             >
-              <div class="truncate text-[15px] font-semibold">{{ chat.title }}</div>
+              <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0 truncate text-[15px] font-semibold">{{ chat.title }}</div>
+                <time class="shrink-0 pt-0.5 text-[11px] font-medium text-slate-400">
+                  {{ formatSessionTimestamp(chat) }}
+                </time>
+              </div>
               <div class="mt-1 truncate text-sm text-slate-500">{{ chat.lastMessage }}</div>
             </button>
             <button
@@ -163,7 +168,7 @@
       <!-- 底部输入框 -->
       <div class="border-t border-white/80 bg-white/85 p-3 shadow-[0_-10px_30px_rgba(15,23,42,0.08)] backdrop-blur md:p-4">
         <el-input
-          class="composer-input mx-auto block max-w-3xl"
+          class="composer-input block w-full"
           size="large"
           placeholder="请输入..."
           v-model="userInputValue"
@@ -222,11 +227,46 @@ const filteredChatList = computed(() => {
   })
 })
 
-function nowText() {
-  return new Date().toLocaleString('zh-CN', {
+function nowText(date = new Date()) {
+  return date.toLocaleString('zh-CN', {
     timeZone: 'Asia/Shanghai',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
     hour12: false
-  })
+  }).replace(/\//g, '-')
+}
+
+function formatSessionTimestamp(chat) {
+  const timestampMs = Number(chat.updatedAtMs || chat.createdAtMs)
+  if (Number.isFinite(timestampMs) && timestampMs > 0) {
+    return new Date(timestampMs).toLocaleString('zh-CN', {
+      timeZone: 'Asia/Shanghai',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    }).replace(/\//g, '-')
+  }
+
+  const rawTime = chat.updatedAt || chat.createdAt || ''
+  const parsedMs = Date.parse(String(rawTime).replace(/-/g, '/'))
+  if (Number.isFinite(parsedMs)) {
+    return new Date(parsedMs).toLocaleString('zh-CN', {
+      timeZone: 'Asia/Shanghai',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    }).replace(/\//g, '-')
+  }
+
+  return rawTime
 }
 
 function cloneMessages(source) {
@@ -248,9 +288,23 @@ function createInitialMessage(chatId) {
   }
 }
 
+function normalizeSession(session, index = 0) {
+  const fallbackMs = Date.now() - index
+  const createdAtMs = Number(session.createdAtMs || session.updatedAtMs) || fallbackMs
+  const updatedAtMs = Number(session.updatedAtMs || session.createdAtMs) || createdAtMs
+
+  return {
+    ...session,
+    createdAt: session.createdAt || session.updatedAt || nowText(new Date(createdAtMs)),
+    createdAtMs,
+    updatedAt: session.updatedAt || session.createdAt || nowText(new Date(updatedAtMs)),
+    updatedAtMs
+  }
+}
+
 function buildSession(id, title, sourceMessages, existing = {}, options = {}) {
   const savedMessages = cloneMessages(sourceMessages)
-  const lastMessage = savedMessages[savedMessages.length - 1]
+  const lastMessage = [...savedMessages].reverse().find(message => message.content?.trim())
   const nowMs = Date.now()
   const shouldTouch = options.touchUpdatedAt !== false || !existing.updatedAtMs
 
@@ -302,11 +356,14 @@ function loadSessions() {
     const raw = localStorage.getItem(STORAGE_KEY)
     const parsed = raw ? JSON.parse(raw) : {}
     const validSessions = Object.fromEntries(
-      Object.entries(parsed).filter(([, session]) => session && Array.isArray(session.messages))
+      Object.entries(parsed)
+        .filter(([, session]) => session && Array.isArray(session.messages))
+        .map(([sessionId, session], index) => [sessionId, normalizeSession(session, index)])
     )
 
     if (Object.keys(validSessions).length > 0) {
       sessions.value = validSessions
+      persistSessions()
       activateSession(chatList.value[0])
       return
     }
@@ -464,7 +521,7 @@ async function sendMessage() {
           if (responseText) {
             aiMessage.content = responseText
             replaceMessage(aiMessage)
-            saveCurrentSession()
+            saveCurrentSession({ touchUpdatedAt: false })
             scrollToBottom()
           }
         }
@@ -474,6 +531,7 @@ async function sendMessage() {
     if (!aiMessage.content && typeof response.data === 'string') {
       aiMessage.content = response.data
       replaceMessage(aiMessage)
+      saveCurrentSession({ touchUpdatedAt: false })
     }
 
     await updateTitle()
@@ -486,7 +544,7 @@ async function sendMessage() {
   } finally {
     activeController = null
     isProcessing.value = false
-    saveCurrentSession()
+    saveCurrentSession({ touchUpdatedAt: false })
     scrollToBottom()
   }
 }
@@ -503,7 +561,7 @@ async function updateTitle() {
 
   if (!firstUserMessage) {
     currentChatTitle.value = '新对话'
-    saveCurrentSession()
+    saveCurrentSession({ touchUpdatedAt: false })
     return
   }
 
@@ -524,7 +582,7 @@ async function updateTitle() {
     currentChatTitle.value = fallbackTitle
   }
 
-  saveCurrentSession()
+  saveCurrentSession({ touchUpdatedAt: false })
 }
 
 function parseMessage(message) {
