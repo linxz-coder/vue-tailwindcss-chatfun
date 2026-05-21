@@ -1,25 +1,35 @@
 <template>
-  <div class="flex h-screen">
+  <div class="relative flex h-[100dvh] overflow-hidden bg-[#f6f8fc] text-slate-900">
+    <button
+      v-if="isSidebarOpen"
+      type="button"
+      class="fixed inset-0 z-20 bg-slate-950/35 backdrop-blur-[2px] md:hidden"
+      aria-label="关闭会话列表"
+      @click="toggleSidebar"
+    />
+
     <!-- 左侧区块 -->
     <div
       :class="[
-        'bg-white overflow-auto h-screen transition-all duration-300 ease-in-out',
-        isSidebarOpen ? 'w-[240px]' : 'w-0',
-        'absolute z-10 md:z-auto md:relative md:w-[300px]'
+        'fixed inset-y-0 left-0 z-30 flex w-[86vw] max-w-[340px] flex-col overflow-hidden border-r border-slate-200 bg-white shadow-2xl transition-transform duration-300 ease-out md:relative md:z-auto md:w-[300px] md:translate-x-0 md:shadow-none',
+        isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
       ]"
       id="leftSidebar"
     >
       <!-- 头部 -->
-      <div class="flex items-center justify-between px-4 py-2">
-        <h1 class="text-3xl font-bold text-pink-500">ChatFUN</h1>
+      <div class="flex items-center justify-between border-b border-slate-100 px-4 py-4">
+        <div>
+          <h1 class="text-2xl font-bold tracking-tight text-slate-950">ChatFUN</h1>
+          <p class="text-xs text-slate-500">本地会话</p>
+        </div>
         <!-- 开始新对话 -->
         <div class="hidden md:block">
-          <el-button circle @click="startNewChat">
+          <el-button class="soft-icon-button" circle @click="startNewChat">
             <img src="/new.svg" width="20" height="20" alt="Start new chat" />
           </el-button>
         </div>
         <div class="md:hidden">
-          <el-button circle @click="toggleSidebar">
+          <el-button class="soft-icon-button" circle @click="toggleSidebar">
             <el-icon>
               <Close />
             </el-icon>
@@ -28,8 +38,8 @@
       </div>
 
       <!-- 搜索框 -->
-      <div class="mt-4 px-4 mb-4">
-        <el-input placeholder="搜索..." v-model="searchValue">
+      <div class="px-4 py-3">
+        <el-input class="search-input" placeholder="搜索..." v-model="searchValue">
           <template #append>
             <el-button :icon="Search" />
           </template>
@@ -37,40 +47,40 @@
       </div>
 
       <!-- 聊天列表 -->
-      <div class="overflow-y-auto">
-        <div
+      <div class="flex-1 space-y-1 overflow-y-auto px-3 pb-6">
+        <button
           v-for="chat in filteredChatList"
           :key="chat.id"
           :class="[
-            'px-4 py-2 cursor-pointer border-r-4 transition-colors',
+            'block w-full rounded-2xl px-4 py-3 text-left transition active:scale-[0.99]',
             chat.id === currentChatId
-              ? 'bg-pink-50 border-pink-500'
-              : 'border-transparent hover:bg-gray-100'
+              ? 'bg-teal-50 text-teal-950 ring-1 ring-teal-100'
+              : 'text-slate-700 hover:bg-slate-50'
           ]"
           @click="selectChat(chat.id)"
         >
-          <div class="font-bold text-lg truncate">{{ chat.title }}</div>
-          <div class="text-sm text-gray-500 truncate">{{ chat.lastMessage }}</div>
-        </div>
+          <div class="truncate text-[15px] font-semibold">{{ chat.title }}</div>
+          <div class="mt-1 truncate text-sm text-slate-500">{{ chat.lastMessage }}</div>
+        </button>
       </div>
     </div>
 
     <!-- 右侧区块 -->
-    <div class="flex flex-1 flex-col bg-gray-100 h-screen">
+    <div class="flex h-[100dvh] min-w-0 flex-1 flex-col overflow-hidden bg-[radial-gradient(circle_at_top_left,#ecfeff_0,#f6f8fc_36%,#f8fafc_100%)]">
       <!-- 聊天标题 -->
-      <div class="p-4 border-b flex items-center justify-between bg-white">
+      <div class="flex min-h-[64px] items-center justify-between gap-2 border-b border-white/80 bg-white/85 px-4 shadow-sm backdrop-blur">
         <div :class="[isSidebarOpen ? 'hidden' : 'block', 'md:hidden']">
-          <el-button circle @click="toggleSidebar">
+          <el-button class="soft-icon-button" circle @click="toggleSidebar">
             <el-icon>
               <More />
             </el-icon>
           </el-button>
         </div>
-        <h1 class="text-xl font-bold text-gray-500 flex-grow text-center truncate px-4">
+        <h1 class="min-w-0 flex-grow truncate px-2 text-center text-lg font-bold text-slate-700 md:text-left md:text-xl">
           {{ currentChatTitle }}
         </h1>
         <div class="md:hidden">
-          <el-button circle @click="startNewChat">
+          <el-button class="primary-icon-button" circle @click="startNewChat">
             <el-icon>
               <Plus />
             </el-icon>
@@ -79,16 +89,16 @@
       </div>
 
       <!-- 消息列表 -->
-      <div ref="messageListRef" class="flex-1 overflow-auto p-4">
+      <div ref="messageListRef" class="flex-1 overflow-auto px-3 py-4 md:px-6">
         <div
           v-for="(message, index) in messages"
           :key="message.id || index"
-          :class="['flex', { 'flex-row-reverse': message.user === 'user' }]"
+          :class="['flex w-full', { 'flex-row-reverse': message.user === 'user' }]"
         >
-          <div class="min-w-[40px] min-h-[40px]">
+          <div class="min-h-[34px] min-w-[34px] md:min-h-[40px] md:min-w-[40px]">
             <img
               :src="message.user === 'ai' ? '/robot_ai.png' : '/me.png'"
-              class="rounded-full"
+              class="h-[34px] w-[34px] rounded-full shadow-sm ring-2 ring-white md:h-10 md:w-10"
               width="40"
               height="40"
               alt="avatar"
@@ -96,16 +106,16 @@
           </div>
           <div
             :class="{
-              'flex flex-col mb-5': true,
-              'mr-14 ml-3': message.user === 'ai',
-              'mr-3 ml-14': message.user === 'user'
+              'mb-5 flex min-w-0 max-w-[82%] flex-col md:max-w-[72%]': true,
+              'mr-7 ml-3 items-start md:mr-14': message.user === 'ai',
+              'mr-3 ml-7 items-end md:ml-14': message.user === 'user'
             }"
           >
             <div
               :class="{
-                'px-4 py-2 rounded-lg shadow-lg md:max-w-fit': true,
-                'bg-white text-black': message.user === 'ai',
-                'bg-green-500 text-white': message.user === 'user'
+                'max-w-full overflow-hidden rounded-2xl px-4 py-2 text-[15px] leading-7 shadow-sm ring-1': true,
+                'rounded-tl-md bg-white text-slate-900 ring-slate-200': message.user === 'ai',
+                'rounded-tr-md bg-teal-600 text-white ring-teal-500': message.user === 'user'
               }"
             >
               <div v-if="message.user === 'ai'">
@@ -121,8 +131,9 @@
       </div>
 
       <!-- 底部输入框 -->
-      <div class="border-t p-4 bg-white">
+      <div class="border-t border-white/80 bg-white/85 p-3 shadow-[0_-10px_30px_rgba(15,23,42,0.08)] backdrop-blur md:p-4">
         <el-input
+          class="composer-input mx-auto block max-w-3xl"
           size="large"
           placeholder="请输入..."
           v-model="userInputValue"
@@ -486,8 +497,59 @@ onMounted(() => {
 <style scoped>
 :deep(.hljs) {
   padding: 1em;
-  border-radius: 5px;
+  border-radius: 12px;
   font-size: 0.9em;
   overflow-x: auto;
+}
+
+.soft-icon-button,
+.primary-icon-button {
+  width: 42px;
+  height: 42px;
+  border: 1px solid rgb(226 232 240);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+}
+
+.soft-icon-button {
+  background: #ffffff;
+  color: #334155;
+}
+
+.primary-icon-button {
+  background: #0f172a;
+  border-color: #0f172a;
+  color: #ffffff;
+}
+
+.search-input :deep(.el-input__wrapper),
+.composer-input :deep(.el-input__wrapper) {
+  border-radius: 16px 0 0 16px;
+  box-shadow: none;
+}
+
+.search-input :deep(.el-input-group__append),
+.composer-input :deep(.el-input-group__append) {
+  border-radius: 0 16px 16px 0;
+  background: #f8fafc;
+  box-shadow: none;
+}
+
+.search-input :deep(.el-input__inner),
+.composer-input :deep(.el-input__inner) {
+  font-size: 16px;
+}
+
+.composer-input :deep(.el-input__wrapper) {
+  min-height: 54px;
+}
+
+.composer-input :deep(.el-input-group__append) {
+  min-width: 48px;
+}
+
+@media (max-width: 767px) {
+  .composer-input :deep(.el-input__wrapper) {
+    min-height: 52px;
+  }
 }
 </style>
