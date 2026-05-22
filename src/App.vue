@@ -150,16 +150,10 @@
               :class="{
                 'max-w-full overflow-hidden rounded-2xl px-4 py-2 text-[15px] leading-7 shadow-sm ring-1': true,
                 'rounded-tl-md bg-white text-slate-900 ring-slate-200': message.user === 'ai',
-                'rounded-tr-md bg-teal-600 text-white ring-teal-500': message.user === 'user'
+                'rounded-tr-md bg-teal-600 text-white ring-teal-500 markdown-user': message.user === 'user'
               }"
             >
-              <div v-if="message.user === 'ai'">
-                <div v-for="(part, partIndex) in parseMessage(message.content)" :key="partIndex">
-                  <highlightjs v-if="part.isCode" :code="part.content" :language="part.language" />
-                  <span v-else v-html="part.content"></span>
-                </div>
-              </div>
-              <span v-else>{{ message.content }}</span>
+              <div class="markdown-body" v-html="renderMarkdown(message.content)"></div>
             </div>
           </div>
         </div>
@@ -190,6 +184,8 @@
 import { computed, nextTick, onMounted, ref } from 'vue'
 import { Close, More, Plus, Promotion, Search } from '@element-plus/icons-vue'
 import axios from 'axios'
+import hljs from 'highlight.js'
+import MarkdownIt from 'markdown-it'
 import { nanoid } from 'nanoid'
 
 const STORAGE_KEY = 'chatfun-vue-sessions-v1'
@@ -210,6 +206,27 @@ const swipedChatId = ref('')
 const touchStart = ref({ chatId: '', x: 0, y: 0 })
 
 let activeController = null
+
+const markdown = new MarkdownIt({
+  html: false,
+  linkify: true,
+  breaks: true,
+  highlight(code, rawLanguage) {
+    const language = String(rawLanguage || '').trim().split(/\s+/)[0].toLowerCase()
+    const safeLanguage = language && hljs.getLanguage(language) ? language : ''
+
+    try {
+      const highlighted = safeLanguage
+        ? hljs.highlight(code, { language: safeLanguage, ignoreIllegals: true }).value
+        : hljs.highlightAuto(code).value
+
+      const languageClass = safeLanguage ? ` language-${safeLanguage}` : ''
+      return `<pre class="markdown-code"><code class="hljs${languageClass}">${highlighted}</code></pre>`
+    } catch {
+      return `<pre class="markdown-code"><code class="hljs">${escapeHtml(code)}</code></pre>`
+    }
+  }
+})
 
 const chatList = computed(() =>
   Object.values(sessions.value).sort((a, b) => (b.updatedAtMs || 0) - (a.updatedAtMs || 0))
@@ -585,41 +602,8 @@ async function updateTitle() {
   saveCurrentSession({ touchUpdatedAt: false })
 }
 
-function parseMessage(message) {
-  const parts = []
-  const codeBlockRegex = /```(\w+)?\n([\s\S]*?)```/g
-  let lastIndex = 0
-  let match
-
-  while ((match = codeBlockRegex.exec(message)) !== null) {
-    if (match.index > lastIndex) {
-      parts.push({
-        isCode: false,
-        content: formatText(message.slice(lastIndex, match.index))
-      })
-    }
-
-    parts.push({
-      isCode: true,
-      language: match[1] || 'plaintext',
-      content: match[2].trim()
-    })
-
-    lastIndex = match.index + match[0].length
-  }
-
-  if (lastIndex < message.length) {
-    parts.push({
-      isCode: false,
-      content: formatText(message.slice(lastIndex))
-    })
-  }
-
-  return parts
-}
-
-function formatText(text) {
-  return escapeHtml(text).replace(/\n/g, '<br>')
+function renderMarkdown(content = '') {
+  return markdown.render(String(content || ''))
 }
 
 function escapeHtml(text) {
@@ -644,11 +628,141 @@ onMounted(() => {
 </script>
 
 <style scoped>
-:deep(.hljs) {
-  padding: 1em;
-  border-radius: 12px;
+.markdown-body {
+  line-height: 1.75;
+  overflow-wrap: anywhere;
+}
+
+.markdown-body :deep(p) {
+  margin: 0 0 0.6rem;
+}
+
+.markdown-body :deep(p:last-child),
+.markdown-body :deep(ul:last-child),
+.markdown-body :deep(ol:last-child),
+.markdown-body :deep(blockquote:last-child),
+.markdown-body :deep(pre:last-child),
+.markdown-body :deep(table:last-child) {
+  margin-bottom: 0;
+}
+
+.markdown-body :deep(h1),
+.markdown-body :deep(h2),
+.markdown-body :deep(h3) {
+  margin: 0.45rem 0 0.55rem;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.markdown-body :deep(h1) {
+  font-size: 1.25rem;
+}
+
+.markdown-body :deep(h2) {
+  font-size: 1.12rem;
+}
+
+.markdown-body :deep(h3) {
+  font-size: 1rem;
+}
+
+.markdown-body :deep(ul),
+.markdown-body :deep(ol) {
+  margin: 0.45rem 0 0.75rem 1.25rem;
+  padding: 0;
+}
+
+.markdown-body :deep(ul) {
+  list-style: disc;
+}
+
+.markdown-body :deep(ol) {
+  list-style: decimal;
+}
+
+.markdown-body :deep(li) {
+  margin: 0.2rem 0;
+  padding-left: 0.05rem;
+}
+
+.markdown-body :deep(a) {
+  color: #0f766e;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.markdown-body :deep(code:not(pre code)) {
+  border-radius: 7px;
+  background: rgba(15, 23, 42, 0.08);
+  padding: 0.12rem 0.38rem;
+  color: #0f172a;
   font-size: 0.9em;
+}
+
+.markdown-body :deep(pre) {
+  max-width: 100%;
+  margin: 0.75rem 0;
   overflow-x: auto;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: 14px;
+  background: #f8fafc;
+}
+
+.markdown-body :deep(pre code) {
+  display: block;
+  min-width: max-content;
+  padding: 1rem;
+  border-radius: 14px;
+  font-size: 0.9em;
+  line-height: 1.65;
+}
+
+.markdown-body :deep(blockquote) {
+  margin: 0.7rem 0;
+  border-left: 3px solid #14b8a6;
+  padding: 0.05rem 0 0.05rem 0.8rem;
+  color: #475569;
+}
+
+.markdown-body :deep(table) {
+  display: block;
+  max-width: 100%;
+  margin: 0.75rem 0;
+  overflow-x: auto;
+  border-collapse: collapse;
+  font-size: 0.92em;
+}
+
+.markdown-body :deep(th),
+.markdown-body :deep(td) {
+  border: 1px solid #cbd5e1;
+  padding: 0.45rem 0.6rem;
+  text-align: left;
+}
+
+.markdown-body :deep(th) {
+  background: #f1f5f9;
+  font-weight: 700;
+}
+
+.markdown-user .markdown-body :deep(a),
+.markdown-user .markdown-body :deep(code:not(pre code)) {
+  color: #ffffff;
+}
+
+.markdown-user .markdown-body :deep(code:not(pre code)) {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.markdown-user .markdown-body :deep(blockquote) {
+  border-left-color: rgba(255, 255, 255, 0.72);
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.markdown-user .markdown-body :deep(pre),
+.markdown-user .markdown-body :deep(table) {
+  color: #0f172a;
 }
 
 .icon-button {
